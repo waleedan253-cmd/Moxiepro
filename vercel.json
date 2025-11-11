@@ -3,16 +3,6 @@
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
   "framework": "vite",
-  "env": {
-    "ANTHROPIC_API_KEY": "@anthropic-api-key",
-    "LEMON_SQUEEZY_API_KEY": "@lemon-squeezy-api-key",
-    "LEMON_SQUEEZY_STORE_ID": "@lemon-squeezy-store-id",
-    "LEMON_SQUEEZY_PRODUCT_ID": "@lemon-squeezy-product-id",
-    "LEMON_SQUEEZY_WEBHOOK_SECRET": "@lemon-squeezy-webhook-secret",
-    "RESEND_API_KEY": "@resend-api-key",
-    "SENDFOX_API_KEY": "@sendfox-api-key",
-    "SENDFOX_LIST_ID": "@sendfox-list-id"
-  },
   "rewrites": [
     {
       "source": "/api/:path*",
