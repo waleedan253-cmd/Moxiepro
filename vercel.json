@@ -25,7 +25,7 @@
       "maxDuration": 60
     },
     "api/create-audit.js": {
-      "memory": 3008,
+      "memory": 1024,
       "maxDuration": 60
     }
   }
