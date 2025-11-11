@@ -8,7 +8,8 @@
  * It handles rate limiting, URL caching, scraping, and analysis.
  */
 
-import puppeteer from 'puppeteer';
+import puppeteer from 'puppeteer-core';
+import chromium from '@sparticuz/chromium';
 import { generateAudit } from './utils/claude.js';
 import {
   saveAudit,
@@ -154,17 +155,12 @@ async function scrapeProfile(url) {
   let browser = null;
 
   try {
-    // Launch headless browser
+    // Launch headless browser (serverless-compatible)
     browser = await puppeteer.launch({
-      headless: 'new',
-      args: [
-        '--no-sandbox',
-        '--disable-setuid-sandbox',
-        '--disable-dev-shm-usage',
-        '--disable-gpu',
-        '--disable-web-security',
-        '--disable-features=IsolateOrigins,site-per-process'
-      ]
+      args: chromium.args,
+      defaultViewport: chromium.defaultViewport,
+      executablePath: await chromium.executablePath(),
+      headless: chromium.headless,
     });
 
     const page = await browser.newPage();

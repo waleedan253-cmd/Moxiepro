@@ -5,7 +5,8 @@
  * Body: { profileUrl: string }
  */
 
-import puppeteer from 'puppeteer';
+import puppeteer from 'puppeteer-core';
+import chromium from '@sparticuz/chromium';
 import { ApiError, ErrorTypes, handleError, validateRequired, isValidPsychologyTodayUrl, logRequest } from './utils/errors.js';
 
 export default async function handler(req, res) {
@@ -54,15 +55,12 @@ async function scrapeProfile(url) {
   let browser = null;
 
   try {
-    // Launch headless browser
+    // Launch headless browser (serverless-compatible)
     browser = await puppeteer.launch({
-      headless: 'new',
-      args: [
-        '--no-sandbox',
-        '--disable-setuid-sandbox',
-        '--disable-dev-shm-usage',
-        '--disable-gpu'
-      ]
+      args: chromium.args,
+      defaultViewport: chromium.defaultViewport,
+      executablePath: await chromium.executablePath(),
+      headless: chromium.headless,
     });
 
     const page = await browser.newPage();

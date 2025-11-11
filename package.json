@@ -12,10 +12,12 @@
   "dependencies": {
     "@anthropic-ai/sdk": "^0.67.0",
     "@react-pdf/renderer": "^4.3.1",
+    "@sparticuz/chromium": "^141.0.0",
     "@vercel/blob": "^2.0.0",
     "@vercel/kv": "^3.0.0",
     "axios": "^1.13.0",
     "puppeteer": "^24.26.1",
+    "puppeteer-core": "^24.29.1",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-router-dom": "^6.20.1",
