@@ -29,13 +29,17 @@ function AuditPage() {
       const data = await response.json()
 
       if (!response.ok) {
-        throw new Error(data.error || 'Failed to create audit')
+        // Better error handling
+        const errorMessage = data.error || data.message || JSON.stringify(data) || 'Failed to create audit'
+        throw new Error(errorMessage)
       }
 
       // Navigate to results page with audit ID
-      navigate(`/results?id=${data.auditId}`)
+      navigate(`/results?id=${data.data?.auditId || data.auditId}`)
     } catch (err) {
-      setError(err.message)
+      console.error('Audit creation error:', err)
+      const errorMessage = err.message || 'An unexpected error occurred'
+      setError(errorMessage)
       setLoading(false)
     }
   }
