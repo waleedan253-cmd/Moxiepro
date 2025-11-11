@@ -23,7 +23,7 @@ function AuditPage() {
       const response = await fetch('/api/create-audit', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ profileUrl, email })
+        body: JSON.stringify({ profileUrl, userEmail: email })
       })
 
       const data = await response.json()
