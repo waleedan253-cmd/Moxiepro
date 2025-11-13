@@ -3,7 +3,13 @@
  * Handles all database operations for audits, users, and caching
  */
 
-import { kv } from '@vercel/kv';
+import { createClient } from '@vercel/kv';
+
+// Initialize KV client with REDIS_URL (fallback to REST API if available)
+const kv = createClient({
+  url: process.env.REDIS_URL || process.env.KV_URL || process.env.KV_REST_API_URL,
+  token: process.env.KV_REST_API_TOKEN, // Optional, only needed for REST API
+});
 
 // ============================================
 // AUDIT OPERATIONS
