@@ -163,7 +163,7 @@ export function isValidPsychologyTodayUrl(url) {
   try {
     const urlObj = new URL(url);
     return urlObj.hostname.includes('psychologytoday.com') &&
-           urlObj.pathname.includes('/profile/');
+           (urlObj.pathname.includes('/therapists/') || urlObj.pathname.includes('/profile/'));
   } catch {
     return false;
   }
