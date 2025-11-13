@@ -3,13 +3,25 @@
  * Handles all database operations for audits, users, and caching
  */
 
-import { createClient } from '@vercel/kv';
+import Redis from 'ioredis';
 
-// Initialize KV client with REDIS_URL (fallback to REST API if available)
-const kv = createClient({
-  url: process.env.REDIS_URL || process.env.KV_URL || process.env.KV_REST_API_URL,
-  token: process.env.KV_REST_API_TOKEN, // Optional, only needed for REST API
-});
+// Initialize Redis client with REDIS_URL
+const redis = new Redis(process.env.REDIS_URL);
+
+// Wrapper to maintain KV-like interface
+const kv = {
+  get: async (key) => {
+    const value = await redis.get(key);
+    return value ? JSON.parse(value) : null;
+  },
+  set: async (key, value, options) => {
+    const stringValue = JSON.stringify(value);
+    if (options?.ex) {
+      return await redis.setex(key, options.ex, stringValue);
+    }
+    return await redis.set(key, stringValue);
+  },
+};
 
 // ============================================
 // AUDIT OPERATIONS
