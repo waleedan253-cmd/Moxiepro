@@ -17,6 +17,7 @@ import {
   getAudit,
   checkRateLimit,
   getOrCreateUser,
+  updateUser,
   getUserByReferralCode,
   incrementReferral,
   getReferralCreditAmount
