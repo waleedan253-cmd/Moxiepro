@@ -162,8 +162,16 @@ export function isValidEmail(email) {
 export function isValidPsychologyTodayUrl(url) {
   try {
     const urlObj = new URL(url);
+    const validPaths = [
+      '/therapists/',
+      '/psychiatrists/',
+      '/treatment-centers/',
+      '/support-groups/',
+      '/profile/' // Legacy/alternative path
+    ];
+
     return urlObj.hostname.includes('psychologytoday.com') &&
-           (urlObj.pathname.includes('/therapists/') || urlObj.pathname.includes('/profile/'));
+           validPaths.some(path => urlObj.pathname.includes(path));
   } catch {
     return false;
   }
