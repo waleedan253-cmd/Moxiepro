@@ -167,23 +167,25 @@ Generate the audit in JSON format with this exact structure:
  */
 function parseAuditResponse(responseText) {
   try {
-    // Try to find JSON in the response (find the first { and last })
-    const firstBrace = responseText.indexOf('{');
-    const lastBrace = responseText.lastIndexOf('}');
+    // Remove markdown code blocks if present (```json ... ```)
+    let cleanedText = responseText
+      .replace(/```json\s*/g, '')
+      .replace(/```\s*/g, '')
+      .trim();
+
+    // Find the first { and last }
+    const firstBrace = cleanedText.indexOf('{');
+    const lastBrace = cleanedText.lastIndexOf('}');
 
     if (firstBrace === -1 || lastBrace === -1) {
       console.error('No JSON braces found in response');
       throw new Error('No JSON found in response');
     }
 
-    let jsonStr = responseText.substring(firstBrace, lastBrace + 1);
+    let jsonStr = cleanedText.substring(firstBrace, lastBrace + 1);
 
-    // Clean up common JSON issues
-    jsonStr = jsonStr
-      .replace(/,(\s*[}\]])/g, '$1')  // Remove trailing commas
-      .replace(/\n/g, '\\n')          // Escape newlines in strings
-      .replace(/\r/g, '\\r')          // Escape carriage returns
-      .replace(/\t/g, '\\t');         // Escape tabs
+    // Clean up common JSON issues (but be careful with string content)
+    jsonStr = jsonStr.replace(/,(\s*[}\]])/g, '$1');  // Remove trailing commas
 
     const auditData = JSON.parse(jsonStr);
 
