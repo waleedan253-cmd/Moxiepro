@@ -21,7 +21,7 @@ export async function generateAudit(profileData) {
     const auditFramework = getAuditFramework();
 
     const message = await client.messages.create({
-      model: 'claude-3-5-sonnet-20241022',
+      model: 'claude-3-5-sonnet-20241220',
       max_tokens: 4096,
       system: [
         {
