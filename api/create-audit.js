@@ -66,17 +66,18 @@ export default async function handler(req, res) {
       );
     }
 
+    // TODO: RE-ENABLE BEFORE LAUNCH! Rate limiting temporarily disabled for MVP testing
     // Check rate limit (3 audits per IP per day)
-    const clientIp = getClientIp(req);
-    const rateLimit = await checkRateLimit(clientIp);
+    // const clientIp = getClientIp(req);
+    // const rateLimit = await checkRateLimit(clientIp);
 
-    if (!rateLimit.allowed) {
-      throw new ApiError(
-        ErrorTypes.RATE_LIMIT_EXCEEDED.message,
-        ErrorTypes.RATE_LIMIT_EXCEEDED.statusCode,
-        ErrorTypes.RATE_LIMIT_EXCEEDED.code
-      );
-    }
+    // if (!rateLimit.allowed) {
+    //   throw new ApiError(
+    //     ErrorTypes.RATE_LIMIT_EXCEEDED.message,
+    //     ErrorTypes.RATE_LIMIT_EXCEEDED.statusCode,
+    //     ErrorTypes.RATE_LIMIT_EXCEEDED.code
+    //   );
+    // }
 
     // Check if this URL was already audited in the last 30 days
     const existingAuditId = await getAuditByUrl(profileUrl);
