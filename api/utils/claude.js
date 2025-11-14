@@ -167,16 +167,29 @@ Generate the audit in JSON format with this exact structure:
  */
 function parseAuditResponse(responseText) {
   try {
-    // Try to find JSON in the response
-    const jsonMatch = responseText.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) {
+    // Try to find JSON in the response (find the first { and last })
+    const firstBrace = responseText.indexOf('{');
+    const lastBrace = responseText.lastIndexOf('}');
+
+    if (firstBrace === -1 || lastBrace === -1) {
+      console.error('No JSON braces found in response');
       throw new Error('No JSON found in response');
     }
 
-    const auditData = JSON.parse(jsonMatch[0]);
+    let jsonStr = responseText.substring(firstBrace, lastBrace + 1);
+
+    // Clean up common JSON issues
+    jsonStr = jsonStr
+      .replace(/,(\s*[}\]])/g, '$1')  // Remove trailing commas
+      .replace(/\n/g, '\\n')          // Escape newlines in strings
+      .replace(/\r/g, '\\r')          // Escape carriage returns
+      .replace(/\t/g, '\\t');         // Escape tabs
+
+    const auditData = JSON.parse(jsonStr);
 
     // Validate required fields
     if (!auditData.overallScore || !auditData.performanceLevel) {
+      console.error('Missing required fields in audit data');
       throw new Error('Invalid audit data structure');
     }
 
@@ -184,6 +197,7 @@ function parseAuditResponse(responseText) {
 
   } catch (error) {
     console.error('Failed to parse audit response:', error);
+    console.error('Response preview:', responseText.substring(0, 500));
     throw new ApiError(
       'Failed to parse audit results',
       500,
