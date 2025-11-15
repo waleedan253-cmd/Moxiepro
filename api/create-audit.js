@@ -122,6 +122,16 @@ export default async function handler(req, res) {
     // Step 1: Scrape the profile
     const profileData = await scrapeProfile(profileUrl);
 
+    // DEBUG: Log what was actually scraped
+    console.log('=== SCRAPED PROFILE DATA ===');
+    console.log('Name:', profileData.name);
+    console.log('About Me length:', profileData.aboutMe?.length || 0);
+    console.log('Headline:', profileData.headline);
+    console.log('Specialties count:', profileData.specialties?.length || 0);
+    console.log('Issues count:', profileData.issues?.length || 0);
+    console.log('Full data:', JSON.stringify(profileData, null, 2).substring(0, 1000));
+    console.log('===========================');
+
     // Step 2: Generate audit using Claude
     const auditData = await generateAudit(profileData);
 
