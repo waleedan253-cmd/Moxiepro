@@ -22,11 +22,12 @@ export async function generateAudit(profileData) {
 
     const message = await client.messages.create({
       model: 'claude-haiku-4-5-20251001',
-      max_tokens: 4096,
+      max_tokens: 8192,
+      temperature: 0.3,
       system: [
         {
           type: 'text',
-          text: 'You are an expert Psychology Today profile auditor with 10+ years of experience helping therapists optimize their profiles for maximum client conversion.',
+          text: 'You are a JSON-only API that audits Psychology Today profiles. You MUST return ONLY valid JSON. No explanations. No markdown. No code blocks. Start with { and end with }.',
           cache_control: { type: 'ephemeral' }
         },
         {
