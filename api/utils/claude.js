@@ -139,7 +139,14 @@ Generate the audit in JSON format with this exact structure:
       "estimatedTime": "<X hours>"
     }
   }
-}`
+}
+
+IMPORTANT: Return ONLY valid JSON. Ensure all strings are properly escaped:
+- Use double quotes for strings
+- Escape special characters (quotes, newlines, etc.)
+- No trailing commas
+- No comments
+- Return the raw JSON without markdown code blocks`
         }
       ]
     });
