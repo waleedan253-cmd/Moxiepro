@@ -41,7 +41,7 @@ Then fill in the values:
 
 1. Go to https://console.anthropic.com/
 2. Create an API key
-3. Add $5-10 credits to your account
+3. Add $$$ credits to your account
 4. Copy the key to `.env`:
 
 ```
@@ -70,7 +70,7 @@ KV_REST_API_READ_ONLY_TOKEN=xxx...
 3. Create a Store
 4. Create a Product:
    - Name: "Psychology Today Profile Audit - Full PDF"
-   - Price: $14.99 USD
+   - Price: $$$ USD
    - Digital product
 5. Go to Settings → API
 6. Create API key
@@ -265,29 +265,6 @@ vercel logs
 | `/api/generate-pdf` | POST | Generates PDF for paid audit |
 | `/api/send-email` | POST | Sends transactional emails |
 
-## Cost Breakdown
-
-### Setup Costs (One-time)
-- Anthropic API credits: $5-10
-- Domain (optional): $12/year
-- **Total: $5-22**
-
-### Monthly Costs (100 audits/month)
-- Claude API: ~$12 (100 audits × $0.12)
-- Vercel: Free (up to 1000 audits/month)
-- Vercel KV: Free (up to 3,000 commands/day)
-- Vercel Blob: ~$0.15 (100 PDFs × 1MB)
-- Resend: Free (3,000 emails/month)
-- SendFox: Free (lifetime)
-- **Total: ~$12/month**
-
-### Revenue (100 audits, 30% conversion)
-- Free audits: 70 × $0 = $0
-- Paid PDFs: 30 × $14.99 = $449.70
-- Lemon Squeezy fees: 30 × ($0.50 + 5%) = $37.49
-- **Net Revenue: $412.21**
-- **Profit: $400/month**
-
 ## Troubleshooting
 
 ### Puppeteer Issues on Vercel
@@ -362,7 +339,3 @@ For issues or questions:
 - **Resend Dashboard**: https://resend.com/emails
 - **SendFox Dashboard**: https://sendfox.com/dashboard
 - **Project Documentation**: See NOTES.md for full roadmap
-
----
-
-**Ready to launch?** Follow the 4-week implementation plan in NOTES.md!
