@@ -1,48 +1,109 @@
-import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 
 function AuditPage() {
-  const navigate = useNavigate()
-  const [profileUrl, setProfileUrl] = useState('')
-  const [email, setEmail] = useState('')
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState('')
-
+  const navigate = useNavigate();
+  const [profileUrl, setProfileUrl] = useState("");
+  const [email, setEmail] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
   const handleSubmit = async (e) => {
-    e.preventDefault()
-    setError('')
-    setLoading(true)
+    e.preventDefault();
+    setError("");
+    setLoading(true);
 
     try {
       // Validate Psychology Today URL
-      if (!profileUrl.includes('psychologytoday.com')) {
-        throw new Error('Please enter a valid Psychology Today profile URL')
+      if (!profileUrl.includes("psychologytoday.com")) {
+        throw new Error("Please enter a valid Psychology Today profile URL");
       }
 
-      // Call the create-audit API
-      const response = await fetch('/api/create-audit', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ profileUrl, userEmail: email })
-      })
+      console.log("Sending request to create audit...");
+      console.log("Profile URL:", profileUrl);
+      console.log("Email:", email);
 
-      const data = await response.json()
+      // Use RELATIVE path - no localhost:3000
+      const response = await fetch("/api/create-audit", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ profileUrl, userEmail: email }),
+      });
+
+      console.log("Response status:", response.status);
+
+      // Check if response is empty
+      const text = await response.text();
+      console.log("Response text:", text);
+
+      if (!text) {
+        throw new Error("Server returned empty response");
+      }
+
+      const data = JSON.parse(text);
+      console.log("Parsed response:", data);
 
       if (!response.ok) {
-        // Better error handling
-        const errorMessage = data.error || data.message || JSON.stringify(data) || 'Failed to create audit'
-        throw new Error(errorMessage)
+        const errorMessage =
+          data.error ||
+          data.message ||
+          JSON.stringify(data) ||
+          "Failed to create audit";
+        throw new Error(errorMessage);
       }
 
       // Navigate to results page with audit ID
-      navigate(`/results?id=${data.data?.auditId || data.auditId}`)
+      // navigate(`/results?id=${data.data?.auditId || data.auditId}`);
+      // Navigate to results page with audit ID
+      const auditId = data.data?.auditId || data.auditId;
+
+      // Show success message
+      alert(
+        `✅ Audit complete! Results have been sent to ${email}. You can also view them on the next page.`,
+      );
+
+      navigate(`/results?id=${auditId}`);
     } catch (err) {
-      console.error('Audit creation error:', err)
-      const errorMessage = err.message || 'An unexpected error occurred'
-      setError(errorMessage)
-      setLoading(false)
+      console.error("Audit creation error:", err);
+      const errorMessage = err.message || "An unexpected error occurred";
+      setError(errorMessage);
+      setLoading(false);
     }
-  }
+  };
+  // const handleSubmit = async (e) => {
+  //   e.preventDefault()
+  //   setError('')
+  //   setLoading(true)
+
+  //   try {
+  //     // Validate Psychology Today URL
+  //     if (!profileUrl.includes('psychologytoday.com')) {
+  //       throw new Error('Please enter a valid Psychology Today profile URL')
+  //     }
+
+  //     // Call the create-audit API
+  //     const response = await fetch('/api/create-audit', {
+  //       method: 'POST',
+  //       headers: { 'Content-Type': 'application/json' },
+  //       body: JSON.stringify({ profileUrl, userEmail: email })
+  //     })
+
+  //     const data = await response.json()
+
+  //     if (!response.ok) {
+  //       // Better error handling
+  //       const errorMessage = data.error || data.message || JSON.stringify(data) || 'Failed to create audit'
+  //       throw new Error(errorMessage)
+  //     }
+
+  //     // Navigate to results page with audit ID
+  //     navigate(`/results?id=${data.data?.auditId || data.auditId}`)
+  //   } catch (err) {
+  //     console.error('Audit creation error:', err)
+  //     const errorMessage = err.message || 'An unexpected error occurred'
+  //     setError(errorMessage)
+  //     setLoading(false)
+  //   }
+  // }
 
   return (
     <div className="bg-gray-50 min-h-screen py-12">
@@ -52,7 +113,8 @@ function AuditPage() {
             Get Your Free PT Profile Audit
           </h1>
           <p className="text-lg text-gray-600">
-            Enter your Psychology Today profile URL and get a comprehensive 100-point audit in seconds
+            Enter your Psychology Today profile URL and get a comprehensive
+            100-point audit in seconds
           </p>
         </div>
 
@@ -106,10 +168,12 @@ function AuditPage() {
                 disabled={loading}
                 className="w-full bg-primary-600 text-white px-6 py-4 rounded-md text-lg font-semibold hover:bg-primary-700 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed"
               >
-                {loading ? 'Analyzing Your Profile...' : 'Get Free Audit'}
+                {loading ? "Analyzing Your Profile..." : "Get Free Audit"}
               </button>
               <p className="text-center text-sm text-gray-500 mt-4">
-                {loading ? 'This may take 30-60 seconds...' : 'Your audit will be ready in seconds'}
+                {loading
+                  ? "This may take 30-60 seconds..."
+                  : "Your audit will be ready in seconds"}
               </p>
             </div>
           </form>
@@ -123,11 +187,15 @@ function AuditPage() {
           <ul className="space-y-2 text-blue-800">
             <li className="flex items-start">
               <span className="mr-2">✓</span>
-              <span>Overall score out of 100 with performance level rating</span>
+              <span>
+                Overall score out of 100 with performance level rating
+              </span>
             </li>
             <li className="flex items-start">
               <span className="mr-2">✓</span>
-              <span>Top 5 critical issues affecting your profile performance</span>
+              <span>
+                Top 5 critical issues affecting your profile performance
+              </span>
             </li>
             <li className="flex items-start">
               <span className="mr-2">✓</span>
@@ -145,7 +213,7 @@ function AuditPage() {
         </div>
       </div>
     </div>
-  )
+  );
 }
 
-export default AuditPage
+export default AuditPage;

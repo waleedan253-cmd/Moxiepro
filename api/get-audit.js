@@ -4,27 +4,32 @@
  * Method: GET
  */
 
-import { getAudit } from './utils/kv.js';
-import { ApiError, ErrorTypes, handleError, logRequest } from './utils/errors.js';
+import { getAudit } from "./utils/db.js";
+import {
+  ApiError,
+  ErrorTypes,
+  handleError,
+  logRequest,
+} from "./utils/errors.js";
 
 export default async function handler(req, res) {
   // Only allow GET requests
-  if (req.method !== 'GET') {
-    return res.status(405).json({ error: 'Method not allowed' });
+  if (req.method !== "GET") {
+    return res.status(405).json({ error: "Method not allowed" });
   }
 
   try {
     const { id } = req.query;
 
     // Log request
-    logRequest('get-audit', { auditId: id });
+    logRequest("get-audit", { auditId: id });
 
     // Validate audit ID
     if (!id) {
       throw new ApiError(
-        'Audit ID is required',
+        "Audit ID is required",
         ErrorTypes.MISSING_PARAMETER.statusCode,
-        ErrorTypes.MISSING_PARAMETER.code
+        ErrorTypes.MISSING_PARAMETER.code,
       );
     }
 
@@ -35,7 +40,7 @@ export default async function handler(req, res) {
       throw new ApiError(
         ErrorTypes.AUDIT_NOT_FOUND.message,
         ErrorTypes.AUDIT_NOT_FOUND.statusCode,
-        ErrorTypes.AUDIT_NOT_FOUND.code
+        ErrorTypes.AUDIT_NOT_FOUND.code,
       );
     }
 
@@ -44,7 +49,7 @@ export default async function handler(req, res) {
       throw new ApiError(
         ErrorTypes.AUDIT_EXPIRED.message,
         ErrorTypes.AUDIT_EXPIRED.statusCode,
-        ErrorTypes.AUDIT_EXPIRED.code
+        ErrorTypes.AUDIT_EXPIRED.code,
       );
     }
 
@@ -56,16 +61,15 @@ export default async function handler(req, res) {
         data: {
           ...audit,
           pdfExpired: true,
-          pdfUrl: null
-        }
+          pdfUrl: null,
+        },
       });
     }
 
     return res.status(200).json({
       success: true,
-      data: audit
+      data: audit,
     });
-
   } catch (error) {
     return handleError(res, error);
   }

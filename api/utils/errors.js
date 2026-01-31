@@ -7,11 +7,11 @@
  * Standard error response format
  */
 export class ApiError extends Error {
-  constructor(message, statusCode = 500, code = 'INTERNAL_ERROR') {
+  constructor(message, statusCode = 500, code = "INTERNAL_ERROR") {
     super(message);
     this.statusCode = statusCode;
     this.code = code;
-    this.name = 'ApiError';
+    this.name = "ApiError";
   }
 }
 
@@ -20,70 +20,71 @@ export class ApiError extends Error {
  */
 export const ErrorTypes = {
   RATE_LIMIT_EXCEEDED: {
-    code: 'RATE_LIMIT_EXCEEDED',
+    code: "RATE_LIMIT_EXCEEDED",
     statusCode: 429,
-    message: 'Rate limit exceeded. You can only perform 3 audits per day.'
+    message: "Rate limit exceeded. You can only perform 3 audits per day.",
   },
   INVALID_URL: {
-    code: 'INVALID_URL',
+    code: "INVALID_URL",
     statusCode: 400,
-    message: 'Invalid Psychology Today profile URL.'
+    message: "Invalid Psychology Today profile URL.",
   },
   INVALID_EMAIL: {
-    code: 'INVALID_EMAIL',
+    code: "INVALID_EMAIL",
     statusCode: 400,
-    message: 'Invalid email address.'
+    message: "Invalid email address.",
   },
   AUDIT_NOT_FOUND: {
-    code: 'AUDIT_NOT_FOUND',
+    code: "AUDIT_NOT_FOUND",
     statusCode: 404,
-    message: 'Audit not found or has expired.'
+    message: "Audit not found or has expired.",
   },
   AUDIT_EXPIRED: {
-    code: 'AUDIT_EXPIRED',
+    code: "AUDIT_EXPIRED",
     statusCode: 410,
-    message: 'This audit has expired. Please generate a new one.'
+    message: "This audit has expired. Please generate a new one.",
   },
   PDF_EXPIRED: {
-    code: 'PDF_EXPIRED',
+    code: "PDF_EXPIRED",
     statusCode: 410,
-    message: 'PDF access has expired. Pay $4.99 to regenerate.'
+    message: "PDF access has expired. Pay $4.99 to regenerate.",
   },
   SCRAPING_FAILED: {
-    code: 'SCRAPING_FAILED',
+    code: "SCRAPING_FAILED",
     statusCode: 500,
-    message: 'Failed to scrape Psychology Today profile. Please verify the URL is correct.'
+    message:
+      "Failed to scrape Psychology Today profile. Please verify the URL is correct.",
   },
   CLAUDE_API_ERROR: {
-    code: 'CLAUDE_API_ERROR',
+    code: "CLAUDE_API_ERROR",
     statusCode: 500,
-    message: 'Failed to generate audit. Please try again.'
+    message: "Failed to generate audit. Please try again.",
   },
   PAYMENT_REQUIRED: {
-    code: 'PAYMENT_REQUIRED',
+    code: "PAYMENT_REQUIRED",
     statusCode: 402,
-    message: 'Payment required to access full audit.'
+    message: "Payment required to access full audit.",
   },
   PAYMENT_FAILED: {
-    code: 'PAYMENT_FAILED',
+    code: "PAYMENT_FAILED",
     statusCode: 402,
-    message: 'Payment processing failed. Please try again.'
+    message: "Payment processing failed. Please try again.",
   },
   WEBHOOK_VERIFICATION_FAILED: {
-    code: 'WEBHOOK_VERIFICATION_FAILED',
+    code: "WEBHOOK_VERIFICATION_FAILED",
     statusCode: 401,
-    message: 'Webhook signature verification failed.'
+    message: "Webhook signature verification failed.",
   },
   MISSING_PARAMETER: {
-    code: 'MISSING_PARAMETER',
+    code: "MISSING_PARAMETER",
     statusCode: 400,
-    message: 'Required parameter is missing.'
+    message: "Required parameter is missing.",
   },
   DATABASE_ERROR: {
-    code: 'DATABASE_ERROR',
+    code: "DATABASE_ERROR",
     statusCode: 500,
-    message: 'Database operation failed. Please try again.'
-  }
+    message: "Database operation failed. Please try again.",
+  },
 };
 
 /**
@@ -98,19 +99,19 @@ export function createErrorResponse(error) {
       error: {
         code: error.code,
         message: error.message,
-        statusCode: error.statusCode
-      }
+        statusCode: error.statusCode,
+      },
     };
   }
 
   // For unknown errors, return generic 500
-  console.error('Unhandled error:', error);
+  console.error("Unhandled error:", error);
   return {
     error: {
-      code: 'INTERNAL_ERROR',
-      message: 'An unexpected error occurred. Please try again.',
-      statusCode: 500
-    }
+      code: "INTERNAL_ERROR",
+      message: "An unexpected error occurred. Please try again.",
+      statusCode: 500,
+    },
   };
 }
 
@@ -138,7 +139,7 @@ export function validateRequired(params, requiredFields) {
       throw new ApiError(
         `Missing required parameter: ${field}`,
         ErrorTypes.MISSING_PARAMETER.statusCode,
-        ErrorTypes.MISSING_PARAMETER.code
+        ErrorTypes.MISSING_PARAMETER.code,
       );
     }
   }
@@ -163,15 +164,17 @@ export function isValidPsychologyTodayUrl(url) {
   try {
     const urlObj = new URL(url);
     const validPaths = [
-      '/therapists/',
-      '/psychiatrists/',
-      '/treatment-centers/',
-      '/support-groups/',
-      '/profile/' // Legacy/alternative path
+      "/therapists/",
+      "/psychiatrists/",
+      "/treatment-centers/",
+      "/support-groups/",
+      "/profile/", // Legacy/alternative path
     ];
 
-    return urlObj.hostname.includes('psychologytoday.com') &&
-           validPaths.some(path => urlObj.pathname.includes(path));
+    return (
+      urlObj.hostname.includes("psychologytoday.com") &&
+      validPaths.some((path) => urlObj.pathname.includes(path))
+    );
   } catch {
     return false;
   }
@@ -183,10 +186,12 @@ export function isValidPsychologyTodayUrl(url) {
  * @returns {string} The IP address
  */
 export function getClientIp(req) {
-  return req.headers['x-forwarded-for']?.split(',')[0] ||
-         req.headers['x-real-ip'] ||
-         req.connection?.remoteAddress ||
-         'unknown';
+  return (
+    req.headers["x-forwarded-for"]?.split(",")[0] ||
+    req.headers["x-real-ip"] ||
+    req.connection?.remoteAddress ||
+    "unknown"
+  );
 }
 
 /**
@@ -198,6 +203,8 @@ export function logRequest(endpoint, data = {}) {
   console.log(`[${new Date().toISOString()}] ${endpoint}`, {
     ...data,
     // Sanitize sensitive data
-    email: data.email ? data.email.replace(/(.{2})(.*)(@.*)/, '$1***$3') : undefined
+    email: data.email
+      ? data.email.replace(/(.{2})(.*)(@.*)/, "$1***$3")
+      : undefined,
   });
 }

@@ -8,9 +8,10 @@
  * It handles rate limiting, URL caching, scraping, and analysis.
  */
 
-import puppeteer from 'puppeteer-core';
-import chromium from '@sparticuz/chromium';
-import { generateAudit } from './utils/claude.js';
+import puppeteer from "puppeteer-core";
+import chromium from "@sparticuz/chromium";
+import puppeteerRegular from "puppeteer";
+import { generateAudit } from "./utils/claude.js";
 import {
   saveAudit,
   getAuditByUrl,
@@ -20,8 +21,8 @@ import {
   updateUser,
   getUserByReferralCode,
   incrementReferral,
-  getReferralCreditAmount
-} from './utils/kv.js';
+  getReferralCreditAmount,
+} from "./utils/db.js";
 import {
   ApiError,
   ErrorTypes,
@@ -30,30 +31,43 @@ import {
   isValidEmail,
   isValidPsychologyTodayUrl,
   getClientIp,
-  logRequest
-} from './utils/errors.js';
+  logRequest,
+} from "./utils/errors.js";
 
 export default async function handler(req, res) {
   // Only allow POST requests
-  if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method not allowed' });
+  if (req.method !== "POST") {
+    return res.status(405).json({ error: "Method not allowed" });
   }
+  // 🔥 ADD THIS DEBUG BLOCK
+  console.log("=== CREATE AUDIT DEBUG ===");
+  console.log("Request body:", req.body);
+  console.log("ENV Check:", {
+    hasAnthropicKey: !!process.env.ANTHROPIC_API_KEY,
+    hasRedisUrl: !!process.env.REDIS_URL,
+    redisUrlPreview: process.env.REDIS_URL?.substring(0, 20) + "...",
+  });
+  console.log("========================");
 
   try {
     const { profileUrl, userEmail, referralCode } = req.body;
 
     // Log request
-    logRequest('create-audit', { userEmail, profileUrl, hasReferralCode: !!referralCode });
+    logRequest("create-audit", {
+      userEmail,
+      profileUrl,
+      hasReferralCode: !!referralCode,
+    });
 
     // Validate required fields
-    validateRequired(req.body, ['profileUrl', 'userEmail']);
+    validateRequired(req.body, ["profileUrl", "userEmail"]);
 
     // Validate email format
     if (!isValidEmail(userEmail)) {
       throw new ApiError(
         ErrorTypes.INVALID_EMAIL.message,
         ErrorTypes.INVALID_EMAIL.statusCode,
-        ErrorTypes.INVALID_EMAIL.code
+        ErrorTypes.INVALID_EMAIL.code,
       );
     }
 
@@ -62,7 +76,7 @@ export default async function handler(req, res) {
       throw new ApiError(
         ErrorTypes.INVALID_URL.message,
         ErrorTypes.INVALID_URL.statusCode,
-        ErrorTypes.INVALID_URL.code
+        ErrorTypes.INVALID_URL.code,
       );
     }
 
@@ -70,6 +84,32 @@ export default async function handler(req, res) {
     // Check rate limit (3 audits per IP per day)
     // const clientIp = getClientIp(req);
     // const rateLimit = await checkRateLimit(clientIp);
+
+    // Check rate limit (3 audits per IP per day)
+    const clientIp = getClientIp(req);
+    let rateLimit;
+    try {
+      rateLimit = await checkRateLimit(clientIp);
+
+      // if (!rateLimit.allowed) {
+      //   throw new ApiError(
+      //     ErrorTypes.RATE_LIMIT_EXCEEDED.message,
+      //     ErrorTypes.RATE_LIMIT_EXCEEDED.statusCode,
+      //     ErrorTypes.RATE_LIMIT_EXCEEDED.code,
+      //   );
+      // }
+    } catch (error) {
+      // 🔥 BETTER ERROR LOGGING
+      console.error("=== CREATE AUDIT ERROR ===");
+      console.error("Error name:", error.name);
+      console.error("Error message:", error.message);
+      console.error("Error stack:", error.stack);
+      console.error("Error code:", error.code);
+      console.error("========================");
+      console.error("Rate limit check failed:", error);
+      // Default to allowing if rate limit check fails
+      rateLimit = { allowed: true, remaining: 3 };
+    }
 
     // if (!rateLimit.allowed) {
     //   throw new ApiError(
@@ -90,9 +130,10 @@ export default async function handler(req, res) {
           data: {
             auditId: existingAudit.id,
             cached: true,
-            message: 'This profile was recently audited. Returning cached results.',
-            remainingAudits: rateLimit.remaining
-          }
+            message:
+              "This profile was recently audited. Returning cached results.",
+            remainingAudits: rateLimit?.remaining || 0,
+          },
         });
       }
     }
@@ -111,10 +152,10 @@ export default async function handler(req, res) {
         // Mark this user as referred
         await updateUser(userEmail, { referredBy: referrer.email });
 
-        logRequest('referral-credited', {
+        logRequest("referral-credited", {
           referrer: referrer.email,
           newUser: userEmail,
-          creditAmount
+          creditAmount,
         });
       }
     }
@@ -123,36 +164,77 @@ export default async function handler(req, res) {
     const profileData = await scrapeProfile(profileUrl);
 
     // DEBUG: Log what was actually scraped
-    console.log('=== SCRAPED PROFILE DATA ===');
-    console.log('Name:', profileData.name);
-    console.log('About Me length:', profileData.aboutMe?.length || 0);
-    console.log('Headline:', profileData.headline);
-    console.log('Specialties count:', profileData.specialties?.length || 0);
-    console.log('Issues count:', profileData.issues?.length || 0);
-    console.log('Full data:', JSON.stringify(profileData, null, 2).substring(0, 1000));
-    console.log('===========================');
+    console.log("=== SCRAPED PROFILE DATA ===");
+    console.log("Name:", profileData.name);
+    console.log("About Me length:", profileData.aboutMe?.length || 0);
+    console.log("Headline:", profileData.headline);
+    console.log("=== CALLING CLAUDE API ===");
+    console.log("API Key exists:", !!process.env.ANTHROPIC_API_KEY);
+    console.log(
+      "API Key preview:",
+      process.env.ANTHROPIC_API_KEY?.substring(0, 20) + "...",
+    );
+
+    console.log("Specialties count:", profileData.specialties?.length || 0);
+    console.log("Issues count:", profileData.issues?.length || 0);
+    console.log(
+      "Full data:",
+      JSON.stringify(profileData, null, 2).substring(0, 1000),
+    );
+    console.log("===========================");
 
     // Step 2: Generate audit using Claude
     const auditData = await generateAudit(profileData);
+    console.log("✅ Claude API succeeded");
+
+    try {
+      const auditData = await generateAudit(profileData);
+      console.log("✅ Claude API succeeded");
+    } catch (error) {
+      console.error("❌ Claude API failed:", error.message);
+      console.error("Full error:", error);
+      throw error;
+    }
 
     // Step 3: Save audit to database
     const savedAudit = await saveAudit({
       profileUrl,
       userEmail,
-      auditData
+      auditData,
     });
-
+    // Step 4: Send email with audit results
+    try {
+      console.log("🔥 Attempting to send email to:", userEmail);
+      console.log("🔥 Audit data type:", typeof auditData);
+      console.log("🔥 Audit data keys:", Object.keys(auditData || {}));
+      console.log("🔥 Has overallScore?:", !!auditData?.overallScore);
+      const { sendAuditEmail } = await import("./utils/email.js");
+      await sendAuditEmail(userEmail, auditData, savedAudit.id);
+      if (emailResult?.success) {
+        console.log(
+          "✅ Email sent successfully, Message ID:",
+          emailResult.messageId,
+        );
+      } else {
+        console.error("❌ Email sending failed:", emailResult?.error);
+      }
+    } catch (emailError) {
+      console.error("Failed to send email:", emailError);
+      console.error("Error name:", emailError.name);
+      console.error("Error message:", emailError.message);
+      console.error("Error stack:", emailError.stack);
+      // Continue even if email fails
+    }
     // Return audit ID
     return res.status(200).json({
       success: true,
       data: {
         auditId: savedAudit.id,
         cached: false,
-        remainingAudits: rateLimit.remaining,
-        referralCode: user.referralCode
-      }
+        remainingAudits: rateLimit?.remaining || 0,
+        referralCode: user.referralCode,
+      },
     });
-
   } catch (error) {
     return handleError(res, error);
   }
@@ -168,44 +250,68 @@ async function scrapeProfile(url) {
 
   try {
     // Launch headless browser (serverless-compatible)
-    browser = await puppeteer.launch({
-      args: chromium.args,
-      defaultViewport: chromium.defaultViewport,
-      executablePath: await chromium.executablePath(),
-      headless: chromium.headless,
-    });
+    const isLocal = !process.env.VERCEL;
+    if (isLocal) {
+      // Local: use regular puppeteer
+      browser = await puppeteerRegular.launch({
+        headless: true,
+        args: ["--no-sandbox", "--disable-setuid-sandbox"],
+      });
+    } else {
+      // Production: use serverless puppeteer
+      browser = await puppeteer.launch({
+        args: chromium.args,
+        defaultViewport: chromium.defaultViewport,
+        executablePath: await chromium.executablePath(),
+        headless: chromium.headless,
+      });
+    }
+    // browser = await puppeteer.launch({
+    //   args: chromium.args,
+    //   defaultViewport: chromium.defaultViewport,
+    //   executablePath: await chromium.executablePath(),
+    //   headless: chromium.headless,
+    // });
 
     const page = await browser.newPage();
 
     // Set viewport and user agent
     await page.setViewport({ width: 1920, height: 1080 });
-    await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
+    await page.setUserAgent(
+      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+    );
+    // ✅ ADD THESE LINES TO AVOID DETECTION:
+    await page.evaluateOnNewDocument(() => {
+      Object.defineProperty(navigator, "webdriver", { get: () => false });
+    });
 
     // Navigate to profile
     await page.goto(url, {
-      waitUntil: 'networkidle2',
-      timeout: 30000
+      waitUntil: "domcontentloaded", // ✅ Just wait for DOM, not all resources
+      timeout: 60000, // Increase timeout to 60 seconds
+      // waitUntil: "networkidle2",
+      // timeout: 30000,
     });
 
     // Wait for content to load
-    await page.waitForSelector('body', { timeout: 10000 });
+    await page.waitForSelector("body", { timeout: 10000 });
 
     // Extract profile data
     const profileData = await page.evaluate(() => {
       const getText = (selector) => {
         const element = document.querySelector(selector);
-        return element ? element.textContent.trim() : '';
+        return element ? element.textContent.trim() : "";
       };
 
       const getAll = (selector) => {
         return Array.from(document.querySelectorAll(selector))
-          .map(el => el.textContent.trim())
-          .filter(text => text.length > 0);
+          .map((el) => el.textContent.trim())
+          .filter((text) => text.length > 0);
       };
 
       const getAttr = (selector, attr) => {
         const element = document.querySelector(selector);
-        return element ? element.getAttribute(attr) : '';
+        return element ? element.getAttribute(attr) : "";
       };
 
       // Try multiple selectors for each field (Psychology Today may update their HTML)
@@ -214,7 +320,7 @@ async function scrapeProfile(url) {
           const text = getText(selector);
           if (text) return text;
         }
-        return '';
+        return "";
       };
 
       const trySelectorsAll = (selectors) => {
@@ -229,137 +335,139 @@ async function scrapeProfile(url) {
         // Basic Info
         name: trySelectors([
           '[data-test-id="therapist-name"]',
-          '.profile-name',
-          'h1.profile-title',
-          'h1'
+          ".profile-name",
+          "h1.profile-title",
+          "h1",
         ]),
 
         credentials: trySelectors([
           '[data-test-id="credentials"]',
-          '.profile-credentials',
-          '.credentials'
+          ".profile-credentials",
+          ".credentials",
         ]),
 
         location: trySelectors([
           '[data-test-id="location"]',
-          '.profile-location',
-          '.location'
+          ".profile-location",
+          ".location",
         ]),
 
         // Headline
         headline: trySelectors([
           '[data-test-id="profile-statement"]',
-          '.profile-statement',
-          '.profile-tagline',
-          'h2.statement'
+          ".profile-statement",
+          ".profile-tagline",
+          "h2.statement",
         ]),
 
         // About Me
         aboutMe: trySelectors([
           '[data-test-id="about-me"]',
-          '#profile-bio',
-          '.profile-about',
-          '.about-me'
+          "#profile-bio",
+          ".profile-about",
+          ".about-me",
         ]),
 
         // Photo
-        photoUrl: getAttr('[data-test-id="profile-photo"]', 'src') ||
-                  getAttr('.profile-photo img', 'src') ||
-                  getAttr('.therapist-photo img', 'src'),
+        photoUrl:
+          getAttr('[data-test-id="profile-photo"]', "src") ||
+          getAttr(".profile-photo img", "src") ||
+          getAttr(".therapist-photo img", "src"),
 
         // Specialties
         specialties: trySelectorsAll([
           '[data-test-id="specialty-item"]',
-          '.profile-specialties li',
-          '.specialties-list li'
+          ".profile-specialties li",
+          ".specialties-list li",
         ]),
 
         // Issues Treated
         issues: trySelectorsAll([
           '[data-test-id="issue-item"]',
-          '.profile-issues li',
-          '.issues-list li'
+          ".profile-issues li",
+          ".issues-list li",
         ]),
 
         // Treatment Approach
         treatmentApproach: trySelectors([
           '[data-test-id="treatment-approach"]',
-          '.profile-treatment',
-          '.treatment-approach'
+          ".profile-treatment",
+          ".treatment-approach",
         ]),
 
         treatmentMethods: trySelectorsAll([
           '[data-test-id="modality-item"]',
-          '.profile-modalities li',
-          '.modalities-list li'
+          ".profile-modalities li",
+          ".modalities-list li",
         ]),
 
         // Client Focus
         clientFocus: trySelectorsAll([
           '[data-test-id="demographic-item"]',
-          '.profile-demographics li',
-          '.client-focus li'
+          ".profile-demographics li",
+          ".client-focus li",
         ]),
 
         ageGroups: trySelectorsAll([
           '[data-test-id="age-group-item"]',
-          '.profile-age-groups li',
-          '.age-groups li'
+          ".profile-age-groups li",
+          ".age-groups li",
         ]),
 
         // Session Info
         sessionType: trySelectorsAll([
           '[data-test-id="session-type"]',
-          '.profile-session-types li',
-          '.session-types li'
+          ".profile-session-types li",
+          ".session-types li",
         ]),
 
         sessionFee: trySelectors([
           '[data-test-id="session-fee"]',
-          '.profile-fee',
-          '.session-fee'
+          ".profile-fee",
+          ".session-fee",
         ]),
 
         insurance: trySelectorsAll([
           '[data-test-id="insurance-item"]',
-          '.profile-insurance li',
-          '.insurance-list li'
+          ".profile-insurance li",
+          ".insurance-list li",
         ]),
 
         // Years of Experience
         yearsExperience: trySelectors([
           '[data-test-id="years-experience"]',
-          '.profile-years-practice',
-          '.years-experience'
+          ".profile-years-practice",
+          ".years-experience",
         ]),
 
         // License Info
         licenseNumber: trySelectors([
           '[data-test-id="license"]',
-          '.profile-license',
-          '.license-info'
+          ".profile-license",
+          ".license-info",
         ]),
 
         // Education
         education: trySelectorsAll([
           '[data-test-id="education-item"]',
-          '.profile-education li',
-          '.education-list li'
+          ".profile-education li",
+          ".education-list li",
         ]),
 
         // Additional Info
         languages: trySelectorsAll([
           '[data-test-id="language-item"]',
-          '.profile-languages li',
-          '.languages-list li'
+          ".profile-languages li",
+          ".languages-list li",
         ]),
 
-        website: getAttr('a[data-test-id="website"]', 'href') ||
-                 getAttr('.profile-website a', 'href'),
+        website:
+          getAttr('a[data-test-id="website"]', "href") ||
+          getAttr(".profile-website a", "href"),
 
         // Meta
         profileUrl: window.location.href,
-        scrapedAt: new Date().toISOString()
+        scrapedAt: new Date().toISOString(),
       };
     });
 
@@ -368,14 +476,13 @@ async function scrapeProfile(url) {
     // Validate that we got meaningful data
     if (!profileData.name && !profileData.aboutMe && !profileData.headline) {
       throw new ApiError(
-        'Failed to extract profile data. The profile may be private, deleted, or the page structure has changed.',
+        "Failed to extract profile data. The profile may be private, deleted, or the page structure has changed.",
         500,
-        'SCRAPING_FAILED'
+        "SCRAPING_FAILED",
       );
     }
 
     return profileData;
-
   } catch (error) {
     if (browser) {
       await browser.close().catch(() => {});
@@ -385,11 +492,11 @@ async function scrapeProfile(url) {
       throw error;
     }
 
-    console.error('Scraping error:', error);
+    console.error("Scraping error:", error);
     throw new ApiError(
       ErrorTypes.SCRAPING_FAILED.message,
       ErrorTypes.SCRAPING_FAILED.statusCode,
-      ErrorTypes.SCRAPING_FAILED.code
+      ErrorTypes.SCRAPING_FAILED.code,
     );
   }
 }

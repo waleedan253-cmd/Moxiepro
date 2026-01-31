@@ -1,13 +1,13 @@
-import { Routes, Route } from 'react-router-dom'
-import Header from './components/Header'
-import Footer from './components/Footer'
-import HomePage from './pages/HomePage'
-import AuditPage from './pages/AuditPage'
-import ResultsPage from './pages/ResultsPage'
-import AboutPage from './pages/AboutPage'
-import PricingPage from './pages/PricingPage'
-import ContactPage from './pages/ContactPage'
-import CaseStudiesPage from './pages/CaseStudiesPage'
+import { Routes, Route } from "react-router-dom";
+import Header from "./components/Header";
+import Footer from "./components/Footer";
+import HomePage from "./pages/HomePage";
+import AuditPage from "./pages/AuditPage";
+import ResultsPage from "./pages/ResultsPage";
+import AboutPage from "./pages/AboutPage";
+import PricingPage from "./pages/PricingPage";
+import ContactPage from "./pages/ContactPage";
+import CaseStudiesPage from "./pages/CaseStudiesPage";
 
 function App() {
   return (
@@ -26,7 +26,7 @@ function App() {
       </main>
       <Footer />
     </div>
-  )
+  );
 }
 
-export default App
+export default App;

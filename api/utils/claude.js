@@ -3,8 +3,8 @@
  * Handles AI audit generation with prompt caching
  */
 
-import Anthropic from '@anthropic-ai/sdk';
-import { ApiError, ErrorTypes } from './errors.js';
+import Anthropic from "@anthropic-ai/sdk";
+import { ApiError, ErrorTypes } from "./errors.js";
 
 const client = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
@@ -15,30 +15,92 @@ const client = new Anthropic({
  * @param {Object} profileData - The scraped profile data
  * @returns {Promise<Object>} The audit results
  */
+
+// export async function generateAudit(profileData) {
+//   try {
+//     if (!process.env.ANTHROPIC_API_KEY) {
+//       throw new ApiError(
+//         "Anthropic API key is missing",
+//         500,
+//         "ANTHROPIC_KEY_MISSING",
+//       );
+//     }
+
+//     const response = await client.messages.create({
+//       model: "claude-sonnet-4-5-20250929", // SAFE + STABLE
+//       max_tokens: 1200,
+//       temperature: 0.7,
+//       messages: [
+//         {
+//           role: "user",
+//           content: `
+// You are an expert profile auditor.
+
+// Analyze the following therapist profile data and generate a detailed audit.
+
+// PROFILE DATA:
+// ${JSON.stringify(profileData, null, 2)}
+//           `,
+//         },
+//       ],
+//     });
+
+//     if (!response?.content?.[0]?.text) {
+//       throw new ApiError(
+//         "Claude returned empty response",
+//         500,
+//         "CLAUDE_EMPTY_RESPONSE",
+//       );
+//     }
+
+//     return response.content[0].text;
+//   } catch (error) {
+//     // 🔥 THIS IS THE FIX
+//     console.error("🔥 Claude API Error:", {
+//       message: error.message,
+//       status: error.status,
+//       code: error.code,
+//       response: error.response?.data,
+//     });
+
+//     if (error instanceof ApiError) {
+//       throw error;
+//     }
+
+//     throw new ApiError(
+//       "Failed to generate audit using AI",
+//       500,
+//       "CLAUDE_GENERATION_FAILED",
+//     );
+//   }
+// }
+
 export async function generateAudit(profileData) {
   try {
     // Load the audit framework template (from F4 file)
     const auditFramework = getAuditFramework();
 
     const message = await client.messages.create({
-      model: 'claude-haiku-4-5-20251001',
+      // model: "claude-haiku-4-5-20251001", ver slow response
+      model: "claude-sonnet-4-20250514",
+
       max_tokens: 8192,
       temperature: 0.3,
       system: [
         {
-          type: 'text',
-          text: 'You are a JSON-only API that audits Psychology Today profiles. You MUST return ONLY valid JSON. No explanations. No markdown. No code blocks. Start with { and end with }.',
-          cache_control: { type: 'ephemeral' }
+          type: "text",
+          text: "You are a JSON-only API that audits Psychology Today profiles. You MUST return ONLY valid JSON. No explanations. No markdown. No code blocks. Start with { and end with }.",
+          cache_control: { type: "ephemeral" },
         },
         {
-          type: 'text',
+          type: "text",
           text: auditFramework,
-          cache_control: { type: 'ephemeral' }
-        }
+          cache_control: { type: "ephemeral" },
+        },
       ],
       messages: [
         {
-          role: 'user',
+          role: "user",
           content: `Analyze this Psychology Today therapist profile and generate a comprehensive audit following the exact framework provided in the system prompt.
 
 **Profile Data:**
@@ -147,23 +209,32 @@ IMPORTANT: Return ONLY valid JSON. Ensure all strings are properly escaped:
 - Escape special characters (quotes, newlines, etc.)
 - No trailing commas
 - No comments
-- Return the raw JSON without markdown code blocks`
-        }
-      ]
+- Return the raw JSON without markdown code blocks`,
+        },
+      ],
     });
 
     // Extract JSON from response
     const responseText = message.content[0].text;
     const auditData = parseAuditResponse(responseText);
+    console.log("✅ Claude API succeeded");
+
+    // 🔥 DEBUG: Check auditData structure
+    console.log("=== AUDIT DATA STRUCTURE ===");
+    console.log("Type:", typeof auditData);
+    console.log("Keys:", Object.keys(auditData || {}));
+    console.log("Has overallScore?:", !!auditData?.overallScore);
+    console.log("overallScore value:", auditData?.overallScore);
+    console.log("Sample data:", JSON.stringify(auditData).substring(0, 500));
+    console.log("===========================");
 
     return auditData;
-
   } catch (error) {
-    console.error('Claude API error:', error);
+    console.error("Claude API error:", error);
     throw new ApiError(
       ErrorTypes.CLAUDE_API_ERROR.message,
       ErrorTypes.CLAUDE_API_ERROR.statusCode,
-      ErrorTypes.CLAUDE_API_ERROR.code
+      ErrorTypes.CLAUDE_API_ERROR.code,
     );
   }
 }
@@ -177,42 +248,37 @@ function parseAuditResponse(responseText) {
   try {
     // Remove markdown code blocks if present (```json ... ```)
     let cleanedText = responseText
-      .replace(/```json\s*/g, '')
-      .replace(/```\s*/g, '')
+      .replace(/```json\s*/g, "")
+      .replace(/```\s*/g, "")
       .trim();
 
     // Find the first { and last }
-    const firstBrace = cleanedText.indexOf('{');
-    const lastBrace = cleanedText.lastIndexOf('}');
+    const firstBrace = cleanedText.indexOf("{");
+    const lastBrace = cleanedText.lastIndexOf("}");
 
     if (firstBrace === -1 || lastBrace === -1) {
-      console.error('No JSON braces found in response');
-      throw new Error('No JSON found in response');
+      console.error("No JSON braces found in response");
+      throw new Error("No JSON found in response");
     }
 
     let jsonStr = cleanedText.substring(firstBrace, lastBrace + 1);
 
     // Clean up common JSON issues (but be careful with string content)
-    jsonStr = jsonStr.replace(/,(\s*[}\]])/g, '$1');  // Remove trailing commas
+    jsonStr = jsonStr.replace(/,(\s*[}\]])/g, "$1"); // Remove trailing commas
 
     const auditData = JSON.parse(jsonStr);
 
     // Validate required fields
     if (!auditData.overallScore || !auditData.performanceLevel) {
-      console.error('Missing required fields in audit data');
-      throw new Error('Invalid audit data structure');
+      console.error("Missing required fields in audit data");
+      throw new Error("Invalid audit data structure");
     }
 
     return auditData;
-
   } catch (error) {
-    console.error('Failed to parse audit response:', error);
-    console.error('Response preview:', responseText.substring(0, 500));
-    throw new ApiError(
-      'Failed to parse audit results',
-      500,
-      'PARSE_ERROR'
-    );
+    console.error("Failed to parse audit response:", error);
+    console.error("Response preview:", responseText.substring(0, 500));
+    throw new ApiError("Failed to parse audit results", 500, "PARSE_ERROR");
   }
 }
 
@@ -362,9 +428,9 @@ export function estimateTokens(text) {
  */
 export function calculateCost(inputTokens, outputTokens, cacheReadTokens = 0) {
   // Claude 3.5 Sonnet pricing (as of Oct 2024)
-  const INPUT_PRICE = 3.00 / 1_000_000;  // $3 per million tokens
-  const OUTPUT_PRICE = 15.00 / 1_000_000; // $15 per million tokens
-  const CACHE_READ_PRICE = 0.30 / 1_000_000; // $0.30 per million cached tokens
+  const INPUT_PRICE = 3.0 / 1_000_000; // $3 per million tokens
+  const OUTPUT_PRICE = 15.0 / 1_000_000; // $15 per million tokens
+  const CACHE_READ_PRICE = 0.3 / 1_000_000; // $0.30 per million cached tokens
 
   const inputCost = inputTokens * INPUT_PRICE;
   const outputCost = outputTokens * OUTPUT_PRICE;
@@ -379,7 +445,7 @@ export function calculateCost(inputTokens, outputTokens, cacheReadTokens = 0) {
       inputTokens,
       outputTokens,
       cacheReadTokens,
-      totalTokens: inputTokens + outputTokens
-    }
+      totalTokens: inputTokens + outputTokens,
+    },
   };
 }
