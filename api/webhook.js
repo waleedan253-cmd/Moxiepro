@@ -7,26 +7,31 @@
  * Triggers PDF generation and email sending
  */
 
-import crypto from 'crypto';
-import { getAudit, markAuditAsPaid } from './utils/kv.js';
-import { ApiError, ErrorTypes, handleError, logRequest } from './utils/errors.js';
+import crypto from "crypto";
+import { getAudit, markAuditAsPaid } from "./utils/kv.js";
+import {
+  ApiError,
+  ErrorTypes,
+  handleError,
+  logRequest,
+} from "./utils/errors.js";
 
 const WEBHOOK_SECRET = process.env.LEMON_SQUEEZY_WEBHOOK_SECRET;
 
 export default async function handler(req, res) {
   // Only allow POST requests
-  if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method not allowed' });
+  if (req.method !== "POST") {
+    return res.status(405).json({ error: "Method not allowed" });
   }
 
   try {
     // Get signature from headers
-    const signature = req.headers['x-signature'];
+    const signature = req.headers["x-signature"];
     if (!signature) {
       throw new ApiError(
-        'Missing webhook signature',
+        "Missing webhook signature",
         ErrorTypes.WEBHOOK_VERIFICATION_FAILED.statusCode,
-        ErrorTypes.WEBHOOK_VERIFICATION_FAILED.code
+        ErrorTypes.WEBHOOK_VERIFICATION_FAILED.code,
       );
     }
 
@@ -38,32 +43,31 @@ export default async function handler(req, res) {
       throw new ApiError(
         ErrorTypes.WEBHOOK_VERIFICATION_FAILED.message,
         ErrorTypes.WEBHOOK_VERIFICATION_FAILED.statusCode,
-        ErrorTypes.WEBHOOK_VERIFICATION_FAILED.code
+        ErrorTypes.WEBHOOK_VERIFICATION_FAILED.code,
       );
     }
 
     const event = req.body;
     const eventType = event.meta?.event_name;
 
-    logRequest('webhook', { eventType, orderId: event.data?.id });
+    logRequest("webhook", { eventType, orderId: event.data?.id });
 
     // Handle different event types
     switch (eventType) {
-      case 'order_created':
-      case 'subscription_payment_success':
+      case "order_created":
+      case "subscription_payment_success":
         await handlePaymentSuccess(event);
         break;
 
-      case 'subscription_payment_failed':
+      case "subscription_payment_failed":
         await handlePaymentFailed(event);
         break;
 
       default:
-        console.log('Unhandled webhook event:', eventType);
+        console.log("Unhandled webhook event:", eventType);
     }
 
     return res.status(200).json({ received: true });
-
   } catch (error) {
     return handleError(res, error);
   }
@@ -76,14 +80,11 @@ export default async function handler(req, res) {
  * @returns {boolean} True if valid
  */
 function verifyWebhookSignature(rawBody, signature) {
-  const hmac = crypto.createHmac('sha256', WEBHOOK_SECRET);
+  const hmac = crypto.createHmac("sha256", WEBHOOK_SECRET);
   hmac.update(rawBody);
-  const digest = hmac.digest('hex');
+  const digest = hmac.digest("hex");
 
-  return crypto.timingSafeEqual(
-    Buffer.from(signature),
-    Buffer.from(digest)
-  );
+  return crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(digest));
 }
 
 /**
@@ -97,16 +98,16 @@ async function handlePaymentSuccess(event) {
   const userEmail = orderData.user_email;
 
   if (!auditId) {
-    console.error('No audit ID in webhook data');
+    console.error("No audit ID in webhook data");
     return;
   }
 
-  logRequest('payment-success', { auditId, userEmail });
+  logRequest("payment-success", { auditId, userEmail });
 
   // Get the audit
   const audit = await getAudit(auditId);
   if (!audit) {
-    console.error('Audit not found for payment:', auditId);
+    console.error("Audit not found for payment:", auditId);
     return;
   }
 
@@ -121,10 +122,10 @@ async function handlePaymentSuccess(event) {
     email: userEmail,
     auditId,
     pdfUrl,
-    audit
+    audit,
   });
 
-  logRequest('payment-processed', { auditId, pdfGenerated: true });
+  logRequest("payment-processed", { auditId, pdfGenerated: true });
 }
 
 /**
@@ -134,8 +135,8 @@ async function handlePaymentSuccess(event) {
 async function handlePaymentFailed(event) {
   const orderData = event.data.attributes;
   const userEmail = orderData.user_email;
-
-  logRequest('payment-failed', { userEmail });
+  [];
+  logRequest("payment-failed", { userEmail });
 
   // Send payment failed email
   await sendPaymentFailedEmail(userEmail);
@@ -150,19 +151,18 @@ async function generatePDF(audit) {
   try {
     // Call PDF generation endpoint
     const response = await fetch(`${process.env.VITE_API_URL}/generate-pdf`, {
-      method: 'POST',
+      method: "POST",
       headers: {
-        'Content-Type': 'application/json'
+        "Content-Type": "application/json",
       },
-      body: JSON.stringify({ auditId: audit.id })
+      body: JSON.stringify({ auditId: audit.id }),
     });
 
     const data = await response.json();
     return data.pdfUrl;
-
   } catch (error) {
-    console.error('PDF generation error:', error);
-    throw new Error('Failed to generate PDF');
+    console.error("PDF generation error:", error);
+    throw new Error("Failed to generate PDF");
   }
 }
 
@@ -173,26 +173,25 @@ async function generatePDF(audit) {
 async function sendPaymentConfirmationEmail({ email, auditId, pdfUrl, audit }) {
   try {
     await fetch(`${process.env.VITE_API_URL}/send-email`, {
-      method: 'POST',
+      method: "POST",
       headers: {
-        'Content-Type': 'application/json'
+        "Content-Type": "application/json",
       },
       body: JSON.stringify({
         to: email,
-        template: 'payment-confirmation',
+        template: "payment-confirmation",
         data: {
           auditId,
           pdfUrl,
           score: audit.auditData.overallScore,
-          performanceLevel: audit.auditData.performanceLevel
-        }
-      })
+          performanceLevel: audit.auditData.performanceLevel,
+        },
+      }),
     });
 
-    console.log('Payment confirmation email sent:', email);
-
+    console.log("Payment confirmation email sent:", email);
   } catch (error) {
-    console.error('Failed to send payment confirmation email:', error);
+    console.error("Failed to send payment confirmation email:", error);
   }
 }
 
@@ -203,20 +202,19 @@ async function sendPaymentConfirmationEmail({ email, auditId, pdfUrl, audit }) {
 async function sendPaymentFailedEmail(email) {
   try {
     await fetch(`${process.env.VITE_API_URL}/send-email`, {
-      method: 'POST',
+      method: "POST",
       headers: {
-        'Content-Type': 'application/json'
+        "Content-Type": "application/json",
       },
       body: JSON.stringify({
         to: email,
-        template: 'payment-failed',
-        data: {}
-      })
+        template: "payment-failed",
+        data: {},
+      }),
     });
 
-    console.log('Payment failed email sent:', email);
-
+    console.log("Payment failed email sent:", email);
   } catch (error) {
-    console.error('Failed to send payment failed email:', error);
+    console.error("Failed to send payment failed email:", error);
   }
 }

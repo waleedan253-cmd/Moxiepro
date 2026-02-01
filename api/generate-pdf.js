@@ -19,7 +19,7 @@ import {
   Image,
 } from "@react-pdf/renderer";
 import { put } from "@vercel/blob";
-import { getAudit } from "./utils/db.js";
+import { getAudit } from "./utils/kv.js";
 import {
   ApiError,
   ErrorTypes,
