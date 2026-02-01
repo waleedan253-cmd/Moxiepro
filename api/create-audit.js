@@ -8,6 +8,8 @@
  * It handles rate limiting, URL caching, scraping, and analysis.
  */
 
+import dotenv from "dotenv";
+dotenv.config();
 import puppeteer from "puppeteer-core";
 import chromium from "@sparticuz/chromium";
 import puppeteerRegular from "puppeteer";
