@@ -24,7 +24,7 @@ import {
   getUserByReferralCode,
   incrementReferral,
   getReferralCreditAmount,
-} from "./utils/db.js";
+} from "./utils/kv.js";
 import {
   ApiError,
   ErrorTypes,
