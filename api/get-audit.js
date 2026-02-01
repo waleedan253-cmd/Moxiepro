@@ -4,7 +4,7 @@
  * Method: GET
  */
 
-import { getAudit } from "./utils/db.js";
+import { getAudit } from "./utils/kv.js";
 import {
   ApiError,
   ErrorTypes,
