@@ -17,32 +17,56 @@ const resend = new Resend(process.env.RESEND_API_KEY);
  */
 export async function sendAuditEmail(recipientEmail, auditData, auditId) {
   try {
-    console.log("📧 Sending email to:", recipientEmail);
+    console.log("📧 Email Service - Starting");
+    console.log("📧 Recipient:", recipientEmail);
+    console.log("📧 Audit ID:", auditId);
+    console.log("📧 API Key exists:", !!process.env.RESEND_API_KEY);
+    console.log(
+      "📧 API Key preview:",
+      process.env.RESEND_API_KEY?.substring(0, 10) + "...",
+    );
 
     // Validate inputs
     if (!recipientEmail || !auditData || !auditData.overallScore) {
-      console.error("❌ Invalid email parameters");
+      console.error("❌ Invalid email parameters:", {
+        hasRecipient: !!recipientEmail,
+        hasAuditData: !!auditData,
+        hasScore: !!auditData?.overallScore,
+      });
       return { success: false, error: "Invalid parameters" };
     }
 
-    const emailHtml = generateAuditEmailHtml(auditData, auditId);
+    // Validate API key
+    if (!process.env.RESEND_API_KEY) {
+      console.error("❌ RESEND_API_KEY is not set in environment variables");
+      return { success: false, error: "Email service not configured" };
+    }
 
+    console.log("📧 Generating email HTML...");
+    const emailHtml = generateAuditEmailHtml(auditData, auditId);
+    console.log("📧 HTML generated, length:", emailHtml.length);
+
+    console.log("📧 Calling Resend API...");
     const { data, error } = await resend.emails.send({
-      from: "PT Profile Audit <onboarding@resend.dev>", // Resend verified domain
+      from: "PT Profile Audit <onboarding@resend.dev>",
       to: [recipientEmail],
       subject: `Your Psychology Today Profile Audit Results - Score: ${auditData.overallScore}/100`,
       html: emailHtml,
     });
 
     if (error) {
-      console.error("❌ Resend error:", error);
-      return { success: false, error: error.message };
+      console.error("❌ Resend API error:", error);
+      return { success: false, error: error.message || JSON.stringify(error) };
     }
 
-    console.log("✅ Email sent successfully, ID:", data.id);
+    console.log("✅ Email sent successfully!");
+    console.log("✅ Message ID:", data.id);
     return { success: true, messageId: data.id };
   } catch (error) {
-    console.error("❌ Email exception:", error);
+    console.error("❌ Email exception caught:", error);
+    console.error("❌ Error type:", error.constructor.name);
+    console.error("❌ Error message:", error.message);
+    console.error("❌ Error stack:", error.stack?.split("\n").slice(0, 3));
     return { success: false, error: error.message };
   }
 }
@@ -86,7 +110,7 @@ function generateAuditEmailHtml(auditData, auditId) {
                 </div>
               </div>
               <h2 style="color: #1f2937; margin: 24px 0 10px 0; font-size: 24px; font-weight: 700;">${auditData.performanceLevel}</h2>
-              <p style="color: #6b7280; margin: 0; font-size: 16px; line-height: 1.6;">${auditData.executiveSummary.currentState}</p>
+              <p style="color: #6b7280; margin: 0; font-size: 16px; line-height: 1.6;">${auditData.executiveSummary?.currentState || "Your profile has been analyzed"}</p>
             </td>
           </tr>
 
@@ -95,10 +119,10 @@ function generateAuditEmailHtml(auditData, auditId) {
             <td style="background: #ffffff; padding: 0 30px 30px 30px;">
               <h3 style="color: #1f2937; margin: 0 0 16px 0; font-size: 20px; font-weight: 700;">🔍 Key Findings</h3>
               <ul style="color: #4b5563; margin: 0; padding-left: 20px; line-height: 1.8;">
-                ${auditData.executiveSummary.keyFindings.map((finding) => `<li style="margin-bottom: 8px;">${finding}</li>`).join("")}
+                ${(auditData.executiveSummary?.keyFindings || []).map((finding) => `<li style="margin-bottom: 8px;">${finding}</li>`).join("")}
               </ul>
               <div style="margin-top: 20px; padding: 16px; background-color: #ecfdf5; border-left: 4px solid #10b981; border-radius: 4px;">
-                <p style="color: #065f46; margin: 0; font-weight: 600;">💰 ${auditData.executiveSummary.potentialImpact}</p>
+                <p style="color: #065f46; margin: 0; font-weight: 600;">💰 ${auditData.executiveSummary?.potentialImpact || "Significant improvement potential"}</p>
               </div>
             </td>
           </tr>
@@ -107,7 +131,7 @@ function generateAuditEmailHtml(auditData, auditId) {
           <tr>
             <td style="background: #fef2f2; padding: 30px;">
               <h3 style="color: #991b1b; margin: 0 0 20px 0; font-size: 20px; font-weight: 700;">⚠️ Top 3 Critical Issues</h3>
-              ${auditData.criticalIssues
+              ${(auditData.criticalIssues || [])
                 .slice(0, 3)
                 .map(
                   (issue, index) => `
@@ -130,12 +154,12 @@ function generateAuditEmailHtml(auditData, auditId) {
                 <tr>
                   <td style="padding: 12px; background: #ffffff; border-radius: 6px; margin-bottom: 8px; width: 48%;">
                     <p style="margin: 0 0 4px 0; color: #6b7280; font-size: 12px; font-weight: 600;">MONTHLY POTENTIAL</p>
-                    <p style="margin: 0; color: #047857; font-size: 20px; font-weight: 700;">${auditData.revenueOpportunity.monthlyRevenuePotential}</p>
+                    <p style="margin: 0; color: #047857; font-size: 20px; font-weight: 700;">${auditData.revenueOpportunity?.monthlyRevenuePotential || "See full report"}</p>
                   </td>
                   <td style="width: 4%;"></td>
                   <td style="padding: 12px; background: #ffffff; border-radius: 6px; width: 48%;">
                     <p style="margin: 0 0 4px 0; color: #6b7280; font-size: 12px; font-weight: 600;">ANNUAL POTENTIAL</p>
-                    <p style="margin: 0; color: #047857; font-size: 20px; font-weight: 700;">${auditData.revenueOpportunity.annualRevenuePotential}</p>
+                    <p style="margin: 0; color: #047857; font-size: 20px; font-weight: 700;">${auditData.revenueOpportunity?.annualRevenuePotential || "See full report"}</p>
                   </td>
                 </tr>
               </table>

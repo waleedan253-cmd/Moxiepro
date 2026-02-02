@@ -186,11 +186,14 @@ export default async function handler(req, res) {
 
     console.log("===========================");
 
-    // ✅ ADD THIS VALIDATION
+    // // ✅ ADD THIS VALIDATION
+
     if (
-      !profileData.aboutMe &&
-      !profileData.headline &&
-      profileData.specialties.length === 0
+      !profileData.name ||
+      (!profileData.aboutMe &&
+        !profileData.headline &&
+        !profileData.treatmentApproach &&
+        profileData.specialties.length === 0)
     ) {
       throw new ApiError(
         "Unable to extract sufficient profile data. The profile may be incomplete, private, or blocked by Psychology Today.",
@@ -198,6 +201,17 @@ export default async function handler(req, res) {
         "INSUFFICIENT_DATA",
       );
     }
+    // if (
+    //   !profileData.aboutMe &&
+    //   !profileData.headline &&
+    //   profileData.specialties.length === 0
+    // ) {
+    //   throw new ApiError(
+    //     "Unable to extract sufficient profile data. The profile may be incomplete, private, or blocked by Psychology Today.",
+    //     400,
+    //     "INSUFFICIENT_DATA",
+    //   );
+    // }
 
     // Step 2: Generate audit using Claude
     const auditData = await generateAudit(profileData);
@@ -219,27 +233,36 @@ export default async function handler(req, res) {
       auditData,
     });
     // Step 4: Send email with audit results
+    // Step 4: Send email with audit results
     try {
-      console.log("🔥 Attempting to send email to:", userEmail);
-      console.log("🔥 Audit data type:", typeof auditData);
-      console.log("🔥 Audit data keys:", Object.keys(auditData || {}));
-      console.log("🔥 Has overallScore?:", !!auditData?.overallScore);
+      console.log("📧 Attempting to send email to:", userEmail);
+      console.log("📧 Audit ID:", savedAudit.id);
+      console.log("📧 Has auditData?:", !!auditData);
+      console.log("📧 Has overallScore?:", !!auditData?.overallScore);
+
       const { sendAuditEmail } = await import("./utils/email.js");
-      await sendAuditEmail(userEmail, auditData, savedAudit.id);
+      const emailResult = await sendAuditEmail(
+        userEmail,
+        auditData,
+        savedAudit.id,
+      );
+
       if (emailResult?.success) {
         console.log(
-          "✅ Email sent successfully, Message ID:",
+          "✅ Email sent successfully! Message ID:",
           emailResult.messageId,
         );
       } else {
         console.error("❌ Email sending failed:", emailResult?.error);
       }
     } catch (emailError) {
-      console.error("Failed to send email:", emailError);
-      console.error("Error name:", emailError.name);
-      console.error("Error message:", emailError.message);
-      console.error("Error stack:", emailError.stack);
-      // Continue even if email fails
+      console.error("❌ Email exception:", emailError);
+      console.error("Error details:", {
+        name: emailError.name,
+        message: emailError.message,
+        stack: emailError.stack?.split("\n").slice(0, 3),
+      });
+      // Continue even if email fails - don't block the audit
     }
     // Return audit ID
     return res.status(200).json({
@@ -312,12 +335,51 @@ async function scrapeProfile(url) {
     // Wait for content to load
     await page.waitForSelector("body", { timeout: 10000 });
 
-    // Wait 3 seconds for JavaScript to render content
-    await new Promise((resolve) => setTimeout(resolve, 3000));
+    // Wait longer for JavaScript to fully render
+    await new Promise((resolve) => setTimeout(resolve, 5000));
+
+    // Try waiting for specific content
+    await page.waitForSelector("h1", { timeout: 10000 }).catch(() => {});
+    await page
+      .waitForSelector("[data-test]", { timeout: 5000 })
+      .catch(() => {});
 
     // Log page title for debugging
     const pageTitle = await page.title();
     console.log("Page loaded:", pageTitle);
+
+    // Enhanced debugging - see EVERYTHING on the page
+    const pageStructure = await page.evaluate(() => {
+      return {
+        allIds: Array.from(document.querySelectorAll("[id]"))
+          .slice(0, 20)
+          .map((el) => ({
+            id: el.id,
+            tag: el.tagName,
+            text: el.textContent?.substring(0, 50),
+          })),
+
+        allDataTests: Array.from(document.querySelectorAll("[data-test]"))
+          .slice(0, 20)
+          .map((el) => ({
+            attr: el.getAttribute("data-test"),
+            tag: el.tagName,
+            text: el.textContent?.substring(0, 50),
+          })),
+
+        sections: Array.from(document.querySelectorAll("section")).map(
+          (el) => ({ class: el.className, id: el.id }),
+        ),
+
+        paragraphs: Array.from(document.querySelectorAll("p"))
+          .slice(0, 5)
+          .map((el) => el.textContent?.substring(0, 100)),
+      };
+    });
+
+    console.log("=== FULL PAGE STRUCTURE ===");
+    console.log(JSON.stringify(pageStructure, null, 2));
+    console.log("===========================");
 
     // Extract profile data
     const profileData = await page.evaluate(() => {
@@ -337,7 +399,7 @@ async function scrapeProfile(url) {
         return element ? element.getAttribute(attr) : "";
       };
 
-      // Try multiple selectors for each field (Psychology Today may update their HTML)
+      // Try multiple selectors for each field
       const trySelectors = (selectors) => {
         for (const selector of selectors) {
           const text = getText(selector);
@@ -357,135 +419,143 @@ async function scrapeProfile(url) {
       return {
         // Basic Info
         name: trySelectors([
-          '[data-test-id="therapist-name"]',
-          ".profile-name",
-          "h1.profile-title",
           "h1",
+          ".profile-name",
+          '[data-test="provider-name"]',
+          ".profile-heading h1",
         ]),
 
         credentials: trySelectors([
-          '[data-test-id="credentials"]',
+          ".profile-subtitle",
+          '[data-test="provider-credentials"]',
           ".profile-credentials",
-          ".credentials",
+          "h2.profile-subtitle",
         ]),
 
         location: trySelectors([
-          '[data-test-id="location"]',
           ".profile-location",
-          ".location",
+          '[data-test="provider-location"]',
+          ".location-text",
         ]),
 
-        // Headline
+        // Headline - CRITICAL FIELD
         headline: trySelectors([
-          '[data-test-id="profile-statement"]',
+          '[data-test="provider-statement"]',
+          ".statement-text",
           ".profile-statement",
+          'h2[class*="statement"]',
           ".profile-tagline",
-          "h2.statement",
         ]),
 
-        // About Me
+        // About Me - MOST CRITICAL FIELD
         aboutMe: trySelectors([
-          '[data-test-id="about-me"]',
-          "#profile-bio",
+          '[data-test="about-me-text"]',
+          '[data-test="provider-bio"]',
+          "#about-me-text",
+          ".about-me-text",
+          '[id*="bio"]',
+          '[class*="bio-text"]',
+          'section[class*="about"] p',
           ".profile-about",
-          ".about-me",
         ]),
 
         // Photo
         photoUrl:
-          getAttr('[data-test-id="profile-photo"]', "src") ||
+          getAttr('[data-test="provider-image"]', "src") ||
           getAttr(".profile-photo img", "src") ||
-          getAttr(".therapist-photo img", "src"),
+          getAttr('img[alt*="photo"]', "src"),
 
-        // Specialties
+        // Specialties - CRITICAL FOR VALIDATION
         specialties: trySelectorsAll([
-          '[data-test-id="specialty-item"]',
+          '[data-test="specialty-item"]',
+          '.attributes-list[data-test*="specialt"] li',
           ".profile-specialties li",
-          ".specialties-list li",
+          'ul[class*="specialt"] li',
         ]),
 
         // Issues Treated
         issues: trySelectorsAll([
-          '[data-test-id="issue-item"]',
+          '[data-test="issue-item"]',
+          '.attributes-list[data-test*="issue"] li',
           ".profile-issues li",
-          ".issues-list li",
+          'ul[class*="issue"] li',
         ]),
 
         // Treatment Approach
         treatmentApproach: trySelectors([
-          '[data-test-id="treatment-approach"]',
-          ".profile-treatment",
-          ".treatment-approach",
+          '[data-test="treatment-orientation"]',
+          ".treatment-orientation",
+          'div[class*="treatment"]',
         ]),
 
         treatmentMethods: trySelectorsAll([
-          '[data-test-id="modality-item"]',
+          '[data-test="modality-item"]',
+          '.attributes-list[data-test*="modalit"] li',
           ".profile-modalities li",
-          ".modalities-list li",
         ]),
 
         // Client Focus
         clientFocus: trySelectorsAll([
-          '[data-test-id="demographic-item"]',
-          ".profile-demographics li",
+          '[data-test="client-focus-item"]',
+          '.attributes-list[data-test*="demographic"] li',
           ".client-focus li",
         ]),
 
         ageGroups: trySelectorsAll([
-          '[data-test-id="age-group-item"]',
-          ".profile-age-groups li",
+          '[data-test="age-group-item"]',
+          '.attributes-list[data-test*="age"] li',
           ".age-groups li",
         ]),
 
         // Session Info
         sessionType: trySelectorsAll([
-          '[data-test-id="session-type"]',
-          ".profile-session-types li",
+          '[data-test="session-format-item"]',
+          '.attributes-list[data-test*="session"] li',
           ".session-types li",
         ]),
 
         sessionFee: trySelectors([
-          '[data-test-id="session-fee"]',
-          ".profile-fee",
+          '[data-test="session-fee"]',
           ".session-fee",
+          'div[class*="fee"]',
         ]),
 
         insurance: trySelectorsAll([
-          '[data-test-id="insurance-item"]',
-          ".profile-insurance li",
+          '[data-test="insurance-item"]',
+          '.attributes-list[data-test*="insurance"] li',
           ".insurance-list li",
         ]),
 
-        // Years of Experience
+        // Experience
         yearsExperience: trySelectors([
-          '[data-test-id="years-experience"]',
-          ".profile-years-practice",
-          ".years-experience",
+          '[data-test="years-in-practice"]',
+          ".years-practice",
+          'div[class*="experience"]',
         ]),
 
-        // License Info
+        // License
         licenseNumber: trySelectors([
-          '[data-test-id="license"]',
-          ".profile-license",
+          '[data-test="license-number"]',
           ".license-info",
+          'div[class*="license"]',
         ]),
 
         // Education
         education: trySelectorsAll([
-          '[data-test-id="education-item"]',
-          ".profile-education li",
+          '[data-test="education-item"]',
           ".education-list li",
+          'ul[class*="education"] li',
         ]),
 
-        // Additional Info
+        // Languages
         languages: trySelectorsAll([
-          '[data-test-id="language-item"]',
-          ".profile-languages li",
+          '[data-test="language-item"]',
           ".languages-list li",
+          'ul[class*="language"] li',
         ]),
 
         website:
-          getAttr('a[data-test-id="website"]', "href") ||
+          getAttr('[data-test="website"]', "href") ||
           getAttr(".profile-website a", "href"),
 
         // Meta
@@ -493,6 +563,181 @@ async function scrapeProfile(url) {
         scrapedAt: new Date().toISOString(),
       };
     });
+
+    // // Extract profile data
+    // const profileData = await page.evaluate(() => {
+    //   const getText = (selector) => {
+    //     const element = document.querySelector(selector);
+    //     return element ? element.textContent.trim() : "";
+    //   };
+
+    //   const getAll = (selector) => {
+    //     return Array.from(document.querySelectorAll(selector))
+    //       .map((el) => el.textContent.trim())
+    //       .filter((text) => text.length > 0);
+    //   };
+
+    //   const getAttr = (selector, attr) => {
+    //     const element = document.querySelector(selector);
+    //     return element ? element.getAttribute(attr) : "";
+    //   };
+
+    //   // Try multiple selectors for each field (Psychology Today may update their HTML)
+    //   const trySelectors = (selectors) => {
+    //     for (const selector of selectors) {
+    //       const text = getText(selector);
+    //       if (text) return text;
+    //     }
+    //     return "";
+    //   };
+
+    //   const trySelectorsAll = (selectors) => {
+    //     for (const selector of selectors) {
+    //       const items = getAll(selector);
+    //       if (items.length > 0) return items;
+    //     }
+    //     return [];
+    //   };
+
+    //   return {
+    //     // Basic Info
+    //     name: trySelectors([
+    //       '[data-test-id="therapist-name"]',
+    //       ".profile-name",
+    //       "h1.profile-title",
+    //       "h1",
+    //     ]),
+
+    //     credentials: trySelectors([
+    //       '[data-test-id="credentials"]',
+    //       ".profile-credentials",
+    //       ".credentials",
+    //     ]),
+
+    //     location: trySelectors([
+    //       '[data-test-id="location"]',
+    //       ".profile-location",
+    //       ".location",
+    //     ]),
+
+    //     // Headline
+    //     headline: trySelectors([
+    //       '[data-test-id="profile-statement"]',
+    //       ".profile-statement",
+    //       ".profile-tagline",
+    //       "h2.statement",
+    //     ]),
+
+    //     // About Me
+    //     aboutMe: trySelectors([
+    //       '[data-test-id="about-me"]',
+    //       "#profile-bio",
+    //       ".profile-about",
+    //       ".about-me",
+    //     ]),
+
+    //     // Photo
+    //     photoUrl:
+    //       getAttr('[data-test-id="profile-photo"]', "src") ||
+    //       getAttr(".profile-photo img", "src") ||
+    //       getAttr(".therapist-photo img", "src"),
+
+    //     // Specialties
+    //     specialties: trySelectorsAll([
+    //       '[data-test-id="specialty-item"]',
+    //       ".profile-specialties li",
+    //       ".specialties-list li",
+    //     ]),
+
+    //     // Issues Treated
+    //     issues: trySelectorsAll([
+    //       '[data-test-id="issue-item"]',
+    //       ".profile-issues li",
+    //       ".issues-list li",
+    //     ]),
+
+    //     // Treatment Approach
+    //     treatmentApproach: trySelectors([
+    //       '[data-test-id="treatment-approach"]',
+    //       ".profile-treatment",
+    //       ".treatment-approach",
+    //     ]),
+
+    //     treatmentMethods: trySelectorsAll([
+    //       '[data-test-id="modality-item"]',
+    //       ".profile-modalities li",
+    //       ".modalities-list li",
+    //     ]),
+
+    //     // Client Focus
+    //     clientFocus: trySelectorsAll([
+    //       '[data-test-id="demographic-item"]',
+    //       ".profile-demographics li",
+    //       ".client-focus li",
+    //     ]),
+
+    //     ageGroups: trySelectorsAll([
+    //       '[data-test-id="age-group-item"]',
+    //       ".profile-age-groups li",
+    //       ".age-groups li",
+    //     ]),
+
+    //     // Session Info
+    //     sessionType: trySelectorsAll([
+    //       '[data-test-id="session-type"]',
+    //       ".profile-session-types li",
+    //       ".session-types li",
+    //     ]),
+
+    //     sessionFee: trySelectors([
+    //       '[data-test-id="session-fee"]',
+    //       ".profile-fee",
+    //       ".session-fee",
+    //     ]),
+
+    //     insurance: trySelectorsAll([
+    //       '[data-test-id="insurance-item"]',
+    //       ".profile-insurance li",
+    //       ".insurance-list li",
+    //     ]),
+
+    //     // Years of Experience
+    //     yearsExperience: trySelectors([
+    //       '[data-test-id="years-experience"]',
+    //       ".profile-years-practice",
+    //       ".years-experience",
+    //     ]),
+
+    //     // License Info
+    //     licenseNumber: trySelectors([
+    //       '[data-test-id="license"]',
+    //       ".profile-license",
+    //       ".license-info",
+    //     ]),
+
+    //     // Education
+    //     education: trySelectorsAll([
+    //       '[data-test-id="education-item"]',
+    //       ".profile-education li",
+    //       ".education-list li",
+    //     ]),
+
+    //     // Additional Info
+    //     languages: trySelectorsAll([
+    //       '[data-test-id="language-item"]',
+    //       ".profile-languages li",
+    //       ".languages-list li",
+    //     ]),
+
+    //     website:
+    //       getAttr('a[data-test-id="website"]', "href") ||
+    //       getAttr(".profile-website a", "href"),
+
+    //     // Meta
+    //     profileUrl: window.location.href,
+    //     scrapedAt: new Date().toISOString(),
+    //   };
+    // });
 
     await browser.close();
 
