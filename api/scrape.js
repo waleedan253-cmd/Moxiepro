@@ -115,13 +115,19 @@ async function scrapeProfile(url) {
     await page.setUserAgent(
       "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
     );
+    await page.evaluateOnNewDocument(() => {
+      Object.defineProperty(navigator, "webdriver", { get: () => false });
+      Object.defineProperty(navigator, "plugins", { get: () => [1, 2, 3] });
+      window.chrome = { runtime: {} };
+    });
 
     // Navigate to profile
     await page.goto(url, {
       waitUntil: "networkidle2",
       timeout: 30000,
     });
-
+    // ADD THIS
+    await page.waitForTimeout(3000);
     // Wait for content to load
     await page
       .waitForSelector(".profile-content", { timeout: 10000 })

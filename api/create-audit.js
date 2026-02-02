@@ -183,7 +183,21 @@ export default async function handler(req, res) {
       "Full data:",
       JSON.stringify(profileData, null, 2).substring(0, 1000),
     );
+
     console.log("===========================");
+
+    // ✅ ADD THIS VALIDATION
+    if (
+      !profileData.aboutMe &&
+      !profileData.headline &&
+      profileData.specialties.length === 0
+    ) {
+      throw new ApiError(
+        "Unable to extract sufficient profile data. The profile may be incomplete, private, or blocked by Psychology Today.",
+        400,
+        "INSUFFICIENT_DATA",
+      );
+    }
 
     // Step 2: Generate audit using Claude
     const auditData = await generateAudit(profileData);
@@ -282,9 +296,11 @@ async function scrapeProfile(url) {
     await page.setUserAgent(
       "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
     );
-    // ✅ ADD THESE LINES TO AVOID DETECTION:
+    // ✅ Better anti-detection
     await page.evaluateOnNewDocument(() => {
       Object.defineProperty(navigator, "webdriver", { get: () => false });
+      Object.defineProperty(navigator, "plugins", { get: () => [1, 2, 3] });
+      window.chrome = { runtime: {} };
     });
 
     // Navigate to profile
@@ -297,6 +313,13 @@ async function scrapeProfile(url) {
 
     // Wait for content to load
     await page.waitForSelector("body", { timeout: 10000 });
+
+    // ✅ ADD THIS: Wait extra time for JavaScript to render
+    await page.waitForTimeout(3000);
+
+    // ✅ ADD THIS: Log page content for debugging
+    const pageTitle = await page.title();
+    console.log("Page loaded:", pageTitle);
 
     // Extract profile data
     const profileData = await page.evaluate(() => {
