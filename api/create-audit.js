@@ -327,24 +327,35 @@ async function scrapeProfile(url) {
     });
 
     // Navigate to profile
+    // await page.goto(url, {
+    //   waitUntil: "domcontentloaded",
+    //   timeout: 60000,
+    // });
+
     await page.goto(url, {
-      waitUntil: "domcontentloaded",
-      timeout: 60000,
+      waitUntil: "networkidle0",
+      timeout: 30000,
     });
 
     // Wait for content to load
-    await page.waitForSelector("body", { timeout: 10000 });
+    // await page.waitForSelector("body", { timeout: 10000 });
 
-    // Wait longer for JavaScript to fully render
-    await new Promise((resolve) => setTimeout(resolve, 5000));
+    // // Wait longer for JavaScript to fully render
+    // await new Promise((resolve) => setTimeout(resolve, 2000));
 
-    // Try waiting for specific content
-    await page.waitForSelector("h1", { timeout: 10000 }).catch(() => {});
-    await page
-      .waitForSelector("[data-test]", { timeout: 5000 })
-      .catch(() => {});
+    // // Try waiting for specific content
+    // await page.waitForSelector("h1", { timeout: 10000 }).catch(() => {});
+    // await page
+    //   .waitForSelector("[data-test]", { timeout: 5000 })
+    //   .catch(() => {});
 
     // Log page title for debugging
+
+    await page
+      .waitForSelector('h1, [data-test="provider-name"]', { timeout: 8000 })
+      .catch(() => {
+        console.warn("Main content selector not found, proceeding anyway");
+      });
     const pageTitle = await page.title();
     console.log("Page loaded:", pageTitle);
 

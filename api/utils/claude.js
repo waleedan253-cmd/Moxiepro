@@ -84,8 +84,8 @@ export async function generateAudit(profileData) {
       // model: "claude-haiku-4-5-20251001", ver slow response
       model: "claude-sonnet-4-20250514",
 
-      max_tokens: 4096,
-      temperature: 0.3,
+      max_tokens: 3000,
+      temperature: 0.5,
       system: [
         {
           type: "text",
