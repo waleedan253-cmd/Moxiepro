@@ -127,7 +127,7 @@ async function scrapeProfile(url) {
       timeout: 30000,
     });
     // ADD THIS
-    await page.waitForTimeout(3000);
+    await new Promise((resolve) => setTimeout(resolve, 3000));
     // Wait for content to load
     await page
       .waitForSelector(".profile-content", { timeout: 10000 })

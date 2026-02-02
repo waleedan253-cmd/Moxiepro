@@ -305,19 +305,17 @@ async function scrapeProfile(url) {
 
     // Navigate to profile
     await page.goto(url, {
-      waitUntil: "domcontentloaded", // ✅ Just wait for DOM, not all resources
-      timeout: 60000, // Increase timeout to 60 seconds
-      // waitUntil: "networkidle2",
-      // timeout: 30000,
+      waitUntil: "domcontentloaded",
+      timeout: 60000,
     });
 
     // Wait for content to load
     await page.waitForSelector("body", { timeout: 10000 });
 
-    // ✅ ADD THIS: Wait extra time for JavaScript to render
-    await page.waitForTimeout(3000);
+    // Wait 3 seconds for JavaScript to render content
+    await new Promise((resolve) => setTimeout(resolve, 3000));
 
-    // ✅ ADD THIS: Log page content for debugging
+    // Log page title for debugging
     const pageTitle = await page.title();
     console.log("Page loaded:", pageTitle);
 
