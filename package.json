@@ -3,6 +3,9 @@
   "version": "1.0.0",
   "description": "SaaS tool that helps therapists audit and optimize their Psychology Today profiles using AI",
   "type": "module",
+  "engines": {
+    "node": ">=20.0.0"
+  },
   "scripts": {
     "dev": "vite",
     "build": "vite build",
